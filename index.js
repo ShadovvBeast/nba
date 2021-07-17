@@ -15,18 +15,20 @@ main();
 async function main()
 {
     // Mongoose
-    await mongoose.connect('mongodb://localhost:27017/nba', {useNewUrlParser: true, useUnifiedTopology: true});
+    await mongoose.connect('mongodb://mongo:27017/nba', {useNewUrlParser: true, useUnifiedTopology: true});
     console.log ('DB Initialized');
 
     // Express
     const app = express();
     const PORT = process.env.PORT || 3000;
-    app.get('/players/parse', async (req, res) => (await parseCSV()) && res.send('CSV Parsed'));
 
     // Api route to query the DB with one parameter:
     // filter - A query parameter, if valid json, will filter according to the MongoDB filter rules, otherwise, will return all
     app.get('/players', async (req, res) =>
         res.json(await player.find(_.isJSON(req.query.filter) ? JSON.parse(req.query.filter) : undefined).lean().exec()));
+
+    // Api route to initiate parsing of the csv, will only return the response after the CSV has been fully parsed
+    app.get('/players/parse', async (req, res) => (await parseCSV()) && res.send('CSV Parsed'));
     app.listen(PORT);
     console.log(`Application listening at port: ${PORT}`);
 
