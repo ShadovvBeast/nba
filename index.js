@@ -4,7 +4,9 @@ import readline from 'readline';
 import _ from 'lodash-contrib';
 import axios from 'axios'
 import mongoose from 'mongoose';
-import {playerSchema} from "./schemas/player.js";
+import { playerSchema } from "./schemas/player.js";
+import { CronJob } from 'cron';
+import Promise  from 'bluebird';
 
 const filepath = "players.csv";
 const player = mongoose.model('Player', playerSchema);
@@ -22,6 +24,12 @@ async function main()
     app.get('/players/parse', async (req, res) => (await parseCSV()) && res.send('CSV Parsed'));
     app.listen(PORT);
     console.log(`Application listening at port: ${PORT}`);
+
+    // Cron job
+    const job = new CronJob('*/15 * * * *', async function() {
+        await Promise.map(player.find().lean().exec(), async doc => enhance(doc.id, doc), {concurrency: 10});
+    });
+    job.start();
 }
 
 async function parseCSV() {
@@ -37,11 +45,12 @@ async function parseCSV() {
     return true;
 }
 
-async function enhance(id) {
+async function enhance(id, playerDB = false) {
     if (!_.isNumeric(id))
         return;
     const playerData = (await axios.get('https://www.balldontlie.io/api/v1/players/' + id)).data;
-    const playerDB = await player.findOne({id}).lean().exec();
+    if (!playerDB)
+        playerDB = await player.findOne({id}).lean().exec();
 
     if (playerDB) { // Already exists in the DB
         const mongoId = playerDB._id;
@@ -55,7 +64,7 @@ async function enhance(id) {
             playerData._id = mongoId;
             const currPlayer = new player(playerData);
             currPlayer.isNew = false;
-            await currPlayer.save(); // Will only save if modified
+            await currPlayer.save();
         }
     } else {
         const newPlayer = new player(playerData);
