@@ -22,6 +22,11 @@ async function main()
     const app = express();
     const PORT = process.env.PORT || 3000;
     app.get('/players/parse', async (req, res) => (await parseCSV()) && res.send('CSV Parsed'));
+
+    // Api route to query the DB with one parameter:
+    // filter - A query parameter, if valid json, will filter according to the MongoDB filter rules, otherwise, will return all
+    app.get('/players', async (req, res) =>
+        res.json(await player.find(_.isJSON(req.query.filter) ? JSON.parse(req.query.filter) : undefined).lean().exec()));
     app.listen(PORT);
     console.log(`Application listening at port: ${PORT}`);
 
@@ -40,7 +45,7 @@ async function parseCSV() {
     });
 
     for await (const line of rl)
-        await enhance(line)
+        await enhance(line);
 
     return true;
 }
